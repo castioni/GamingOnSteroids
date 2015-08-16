@@ -124,7 +124,7 @@ local wardSpots = {
 	{13453,51,2820}, -- Bottom Lane Purple Bush - Top
 	{13004,51,2216}, -- Bottom Lane Purple Bush - Bot
 	{12773,52,1876}, -- Bottom Lane Blue Bush - Top
-	{12103,51,1328}, -- Bottom Lane Blue Bush - Bot
+	{12103,51,1328} -- Bottom Lane Blue Bush - Bot
 };
 
 -- Let's get this party started...
@@ -183,7 +183,7 @@ OnLoop(function(myHero)
 		end;
 		
 		-- Position scanner. Im using this to get my warding spots...
-		if Config.Scanner ~= true then
+		if Config.Scanner == true then
 			local origin = GetOrigin(myHero);
 			local mousepos = GetMousePos();
 			local myscreenpos = WorldToScreen(1,origin.x,origin.y,origin.z);
