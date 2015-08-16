@@ -1,9 +1,10 @@
 Config = scriptConfig("Warding Assistant", "Warding Assistant")
 Config.addParam("Enabled", "Script Enabled", SCRIPT_PARAM_ONOFF, true)
-Config.addParam("AutoWard", "AutoWard Key", SCRIPT_PARAM_KEYDOWN, string.byte("Z"))
+Config.addParam("WardKey", "Put ward on spot", SCRIPT_PARAM_KEYDOWN, string.byte("Z"))
+Config.addParam("AutoWardKey", "Ward closest spot", SCRIPT_PARAM_KEYDOWN, string.byte("O"))
 Config.addParam("Nearby", "Only when nearby", SCRIPT_PARAM_ONOFF, true)
 Config.addParam("Scanner", "Coord picker", SCRIPT_PARAM_ONOFF, false)
-class "Point" -- {
+class "Point"
   function Point:__init(x, y, z)
     local pos = GetOrigin(x) or type(x) ~= "number" and x or nil
     self.x = pos and pos.x or x
@@ -151,15 +152,27 @@ OnLoop(function(myHero)
 			-- Hello there my old friend, I'll need your help...
 			local i = 1;
 			
+			-- Consider 1st ward on the last as the closest one.
+			local closestWard = Point(wardSpots[1][1],wardSpots[1][2],wardSpots[1][3]);
+			local closestWardDistance = GetDistanceSqr(closestWard,GetOrigin(myHero));
+			
 			-- Check all warding spots
 			while wardSpots[i] do
 			
 				-- Get the warding spot...
 				local wardPosition = Point(wardSpots[i][1],wardSpots[i][2],wardSpots[i][3]);
 			
+				-- Calculate the distance
+				local distance = GetDistanceSqr(wardPosition,GetOrigin(myHero));
+			
+				-- It is a closest ward?
+				if distance < closestWardDistance then
+					closestWard = wardPosition;
+					closestWardDistance = distance;
+				end;
+			
 				-- Don't show warding circles if hero is too far away
-				if Config.Nearby ~= true -- Except when player disabled this option...
-				or GetDistanceSqr(wardPosition,GetOrigin(myHero)) < 1000000
+				if Config.Nearby ~= true or distance < 1000000
 				then
 				
 					-- Initialize the circle
@@ -169,8 +182,8 @@ OnLoop(function(myHero)
 					if Circle:contains(GetMousePos()) then
 						Circle:draw(0xffff0000);
 						
-						-- Key pressed
-						if Config.AutoWard then
+						-- Manual ward
+						if Config.WardKey then
 							CastSkillShot(wardSlot,wardPosition);
 						end;
 						
@@ -179,6 +192,11 @@ OnLoop(function(myHero)
 				
 				end;
 				i=i+1; -- Let's move out to next spot...
+			end;
+			
+			-- Automatic ward
+			if Config.AutoWardKey then
+				CastSkillShot(wardSlot,closestWard);
 			end;
 		end;
 		
