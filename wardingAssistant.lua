@@ -183,7 +183,7 @@ OnLoop(function(myHero)
 		end;
 		
 		-- Position scanner. Im using this to get my warding spots...
-		if Option.Scanner ~= true then
+		if Config.Scanner ~= true then
 			local origin = GetOrigin(myHero);
 			local mousepos = GetMousePos();
 			local myscreenpos = WorldToScreen(1,origin.x,origin.y,origin.z);
