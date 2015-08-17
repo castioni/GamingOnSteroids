@@ -1,9 +1,11 @@
-Config = scriptConfig("Warding Assistant", "Warding Assistant")
-Config.addParam("Enabled", "Script Enabled", SCRIPT_PARAM_ONOFF, true)
-Config.addParam("WardKey", "Put ward on spot", SCRIPT_PARAM_KEYDOWN, string.byte("Z"))
-Config.addParam("AutoWardKey", "Ward closest spot", SCRIPT_PARAM_KEYDOWN, string.byte("O"))
-Config.addParam("Nearby", "Only when nearby", SCRIPT_PARAM_ONOFF, true)
-Config.addParam("Scanner", "Coord picker", SCRIPT_PARAM_ONOFF, false)
+local developerMode = false;
+
+WAConfig = scriptConfig("Warding Assistant", "Warding Assistant");
+WAConfig.addParam("Enabled", "Script Enabled", SCRIPT_PARAM_ONOFF, true);
+WAConfig.addParam("Nearby", "Only when nearby", SCRIPT_PARAM_ONOFF, true);
+WAConfig.addParam("WardKey", "Put ward on spot", SCRIPT_PARAM_KEYDOWN, string.byte("Z"));
+WAConfig.addParam("AutoWardKey", "Ward closest spot", SCRIPT_PARAM_KEYDOWN, string.byte("O"));
+WAConfig.addParam("Version", "Version 0.2.8 ALPHA", SCRIPT_PARAM_INFO, false);
 class "Point"
   function Point:__init(x, y, z)
     local pos = GetOrigin(x) or type(x) ~= "number" and x or nil
@@ -131,49 +133,36 @@ local wardSpots = {
 	{12103,51,1328} -- Bottom Lane Blue Bush - Bot
 };
 
-	function isItemAvailable (item)
-		local itemSlot = GetItemSlot(myHero,item);
-		if itemSlot ~= 0					-- Does item exists in hero eq?
-		 and CanUseSpell(myHero,itemSlot) == READY	-- And is it ready to use?
-		then return true; end;				-- If it is, you're ready to go!
-		return false;					-- Otherwise, you're not...
-	end
+--# Warding Sources #--
+local wardItems = {
+	3340,	-- Warding Totem (Trinket)
+	3361,	-- Greater Warding Totem (Trinket Upgrade)
+	2049,	-- Sightstone (Blue Stone)
+	2045,	-- Ruby Sightstone (Red Stone)
+	2044	-- Stealth Ward (Grenn Ward)
+}
+
+--# Searching for available warding item #--
+-- Thanks for ilovesona and his Simple Ward Jump script for this solution!
+function getWardSlot ()
+	local itemSlot = 0;
+	for i=1, #wardItems, 1 do
+		itemSlot = GetItemSlot(myHero,wardItems[i]);
+		if itemSlot ~= 0 and CanUseSpell(myHero, itemSlot) == READY
+		then return itemSlot; end;
+	end;
+	return 0;
+end;
 
 -- Let's get this party started...
 OnLoop(function(myHero)
 	
 	-- Is Warding Assistant enabled?
-	if Config.Enabled then
+	if WAConfig.Enabled then
 
-		local wardSlot = 0;
-		local tester = "";
+		-- First of all, check if player got any wards with him...
+		local wardSlot = getWardSlot();
 	
-		-- Checking for Warding Totem (Trinket)
-		if isItemAvailable(3340) then
-			wardSlot = GetItemSlot(myHero,3340);
-			tester ="trink";
-			
-		-- Checking for Greater Warding Totem (Trinket Upgrade)
-		elseif isItemAvailable(3361) then
-			wardSlot = GetItemSlot(myHero,3361); 
-			tester ="upg";
-			
-		-- Checking for Ruby Sightstone
-		elseif isItemAvailable(2045) then
-			wardSlot = GetItemSlot(myHero,2045); 
-			tester ="ruby";
-			
-		-- Checking for Sightstone
-		elseif isItemAvailable(2049) then
-			wardSlot = GetItemSlot(myHero,2049); 
-			tester ="kamyk";
-			
-		-- Checking for Stealth Ward
-		elseif isItemAvailable(2044) then
-			wardSlot = GetItemSlot(myHero,2044); 
-			tester ="ward";
-		end;
-		
 		-- Don't show warding circles if player have no wards.
 		if wardSlot ~= 0 then
 			
@@ -200,7 +189,7 @@ OnLoop(function(myHero)
 				end;
 			
 				-- Don't show warding circles if hero is too far away
-				if Config.Nearby ~= true or distance < 1000000
+				if WAConfig.Nearby ~= true or distance < 1000000
 				then
 				
 					-- Initialize the circle
@@ -211,7 +200,7 @@ OnLoop(function(myHero)
 						Circle:draw(0xffff0000);
 						
 						-- Manual ward
-						if Config.WardKey then
+						if WAConfig.WardKey then
 							CastSkillShot(wardSlot,wardPosition);
 						end;
 						
@@ -224,17 +213,27 @@ OnLoop(function(myHero)
 			
 			
 			-- Automatic ward
-			if Config.AutoWardKey then
+			if WAConfig.AutoWardKey then
 				CastSkillShot(wardSlot,closestWard);
 			end;
 		end;
 		
 		-- Position scanner. Im using this to get my warding spots...
-		if Config.Scanner == true then
+		if developerMode == true then
 			local origin = GetOrigin(myHero);
 			local mousepos = GetMousePos();
 			local myscreenpos = WorldToScreen(1,origin.x,origin.y,origin.z);
-			DrawText(tester .. " " .. math.floor(mousepos.x) .. " " .. math.floor(mousepos.y) .. " " .. math.floor(mousepos.z),24,myscreenpos.x,myscreenpos.y-20,0xff00ff00); 
+			--DrawText(" " .. math.floor(mousepos.x) .. " " .. math.floor(mousepos.y) .. " " .. math.floor(mousepos.z),24,myscreenpos.x,myscreenpos.y-20,0xff00ff00); 
+			
+			-- Show ward slots status
+			local text =
+				"Trinket:    " .. GetItemSlot(myHero,3340) .. " " .. CanUseSpell(myHero, GetItemSlot(myHero,3340)) .. "\n" ..
+				"TrinkUpgr:  " .. GetItemSlot(myHero,3361) .. " " .. CanUseSpell(myHero, GetItemSlot(myHero,3361)) .. "\n" ..
+				"Sightstone: " .. GetItemSlot(myHero,2049) .. " " .. CanUseSpell(myHero, GetItemSlot(myHero,2049)) .. "\n" ..
+				"Rubystone:  " .. GetItemSlot(myHero,2045) .. " " .. CanUseSpell(myHero, GetItemSlot(myHero,2045)) .. "\n" ..
+				"NormalWard: " .. GetItemSlot(myHero,2044) .. " " .. CanUseSpell(myHero, GetItemSlot(myHero,2044));
+				
+			DrawText(text,24,myscreenpos.x,myscreenpos.y-50,0xff00ff00); 
 		end; 
 	end;
 end)
