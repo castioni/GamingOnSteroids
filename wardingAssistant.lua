@@ -135,16 +135,28 @@ OnLoop(function(myHero)
 	if Config.Enabled then
 
 		-- Do you even have wards in your eq?
-		local wardSlot = GetItemSlot(myHero,3340); -- Warding Totem (Trinket)
-		if wardSlot == 0 then -- He got no trinket or he is unable to use it? Lets find something else..
-			wardSlot = GetItemSlot(myHero,2049); -- Sightstone
-			if wardSlot == 0 then
-				wardSlot = GetItemSlot(myHero,2045); -- Ruby Sightstone
-				if wardSlot == 0 then
-					wardSlot = GetItemSlot(myHero,2044); -- Stealth Ward
-				end;
-			 end;
-		 end;
+		local wardSlot = 0;
+		
+		-- Checking for Warding Totem (Trinket)
+		if CanUseSpell(myHero,GetItemSlot(myHero,3340)) == READY then
+			wardSlot = GetItemSlot(myHero,3340);
+			
+		-- Checking for Greater Warding Totem (Trinket Upgrade)
+		elseif CanUseSpell(myHero,GetItemSlot(myHero,3361)) == READY then
+			wardSlot = GetItemSlot(myHero,3361); 
+			
+		-- Checking for Sightstone
+		elseif CanUseSpell(myHero,GetItemSlot(myHero,2049)) == READY then
+			wardSlot = GetItemSlot(myHero,2049); 
+			
+		-- Checking for Ruby Sightstone
+		elseif CanUseSpell(myHero,GetItemSlot(myHero,2045)) == READY then
+			wardSlot = GetItemSlot(myHero,2045); 
+			
+		-- Checking for Stealth Ward
+		elseif CanUseSpell(myHero,GetItemSlot(myHero,2044)) == READY then
+			wardSlot = GetItemSlot(myHero,2044); 
+		end;
 		
 		-- Don't show warding circles if player have no wards.
 		if wardSlot ~= 0 then
