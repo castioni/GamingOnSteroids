@@ -15,6 +15,9 @@ class "Point"
 --# Warding Spots #--
 local wardSpots = {
 
+	-- 100 - Niebiescy
+	-- 200 - Fioletowi
+
 	-----------------------
 	--# PurpleTeam Base #--
 	-----------------------
@@ -128,34 +131,47 @@ local wardSpots = {
 	{12103,51,1328} -- Bottom Lane Blue Bush - Bot
 };
 
+	function isItemAvailable (item)
+		local itemSlot = GetItemSlot(myHero,item);
+		if itemSlot ~= 0					-- Does item exists in hero eq?
+		 and CanUseSpell(myHero,itemSlot) == READY	-- And is it ready to use?
+		then return true; end;				-- If it is, you're ready to go!
+		return false;					-- Otherwise, you're not...
+	end
+
 -- Let's get this party started...
 OnLoop(function(myHero)
-
+	
 	-- Is Warding Assistant enabled?
 	if Config.Enabled then
 
-		-- Do you even have wards in your eq?
 		local wardSlot = 0;
-		
+		local tester = "";
+	
 		-- Checking for Warding Totem (Trinket)
-		if CanUseSpell(myHero,GetItemSlot(myHero,3340)) == READY then
+		if isItemAvailable(3340) then
 			wardSlot = GetItemSlot(myHero,3340);
+			tester ="trink";
 			
 		-- Checking for Greater Warding Totem (Trinket Upgrade)
-		elseif CanUseSpell(myHero,GetItemSlot(myHero,3361)) == READY then
+		elseif isItemAvailable(3361) then
 			wardSlot = GetItemSlot(myHero,3361); 
-			
-		-- Checking for Sightstone
-		elseif CanUseSpell(myHero,GetItemSlot(myHero,2049)) == READY then
-			wardSlot = GetItemSlot(myHero,2049); 
+			tester ="upg";
 			
 		-- Checking for Ruby Sightstone
-		elseif CanUseSpell(myHero,GetItemSlot(myHero,2045)) == READY then
+		elseif isItemAvailable(2045) then
 			wardSlot = GetItemSlot(myHero,2045); 
+			tester ="ruby";
+			
+		-- Checking for Sightstone
+		elseif isItemAvailable(2049) then
+			wardSlot = GetItemSlot(myHero,2049); 
+			tester ="kamyk";
 			
 		-- Checking for Stealth Ward
-		elseif CanUseSpell(myHero,GetItemSlot(myHero,2044)) == READY then
+		elseif isItemAvailable(2044) then
 			wardSlot = GetItemSlot(myHero,2044); 
+			tester ="ward";
 		end;
 		
 		-- Don't show warding circles if player have no wards.
@@ -206,6 +222,7 @@ OnLoop(function(myHero)
 				i=i+1; -- Let's move out to next spot...
 			end;
 			
+			
 			-- Automatic ward
 			if Config.AutoWardKey then
 				CastSkillShot(wardSlot,closestWard);
@@ -217,7 +234,7 @@ OnLoop(function(myHero)
 			local origin = GetOrigin(myHero);
 			local mousepos = GetMousePos();
 			local myscreenpos = WorldToScreen(1,origin.x,origin.y,origin.z);
-			DrawText(math.floor(mousepos.x) .. " " .. math.floor(mousepos.y) .. " " .. math.floor(mousepos.z),24,myscreenpos.x,myscreenpos.y-20,0xff00ff00); 
+			DrawText(tester .. " " .. math.floor(mousepos.x) .. " " .. math.floor(mousepos.y) .. " " .. math.floor(mousepos.z),24,myscreenpos.x,myscreenpos.y-20,0xff00ff00); 
 		end; 
 	end;
 end)
