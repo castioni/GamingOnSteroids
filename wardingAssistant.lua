@@ -1,11 +1,22 @@
+-- General settings --
+WAConfig = scriptConfig("Warding Assistant", "Warding Assistant");
+WAConfig.addParam("Version", "Version 0.4 BETA", SCRIPT_PARAM_INFO, false);
+WAConfig.addParam("Enabled", "Script Enabled", SCRIPT_PARAM_ONOFF, true);
+
+-- Drawing options --
+WAConfig.addParam("ShowUnrecommended",	"Unrecommended spots", SCRIPT_PARAM_ONOFF, false);
+WAConfig.addParam("ShowEnemyTeamSpots",	"Enemy team spots", SCRIPT_PARAM_ONOFF, false);
+WAConfig.addParam("ShowNearbyOnly",		"Only nearby spots", SCRIPT_PARAM_ONOFF, true);
+WAConfig.addParam("ShowSafeWards",		"SafeWards spots", SCRIPT_PARAM_ONOFF, true);
+
+-- Keybind options --
+WAConfig.addParam("WardKey", "Ward selected spot", SCRIPT_PARAM_KEYDOWN, string.byte("Z"));
+WAConfig.addParam("AutoWardKey", "Ward closest spot", SCRIPT_PARAM_KEYDOWN, string.byte("O"));
+
+-- Some debug tools, I'll remove it from the final version.
 local developerMode = false;
 
-WAConfig = scriptConfig("Warding Assistant", "Warding Assistant");
-WAConfig.addParam("Version", "Version 0.3 ALPHA", SCRIPT_PARAM_INFO, false);
-WAConfig.addParam("Enabled", "Script Enabled", SCRIPT_PARAM_ONOFF, true);
-WAConfig.addParam("Nearby", "Only when nearby", SCRIPT_PARAM_ONOFF, true);
-WAConfig.addParam("WardKey", "Put ward on spot", SCRIPT_PARAM_KEYDOWN, string.byte("Z"));
-WAConfig.addParam("AutoWardKey", "Ward closest spot", SCRIPT_PARAM_KEYDOWN, string.byte("O"));
+--# Point Class #--
 class "Point"
   function Point:__init(x, y, z)
     local pos = GetOrigin(x) or type(x) ~= "number" and x or nil
@@ -17,16 +28,33 @@ class "Point"
 --# Warding Spots #--
 local wardSpots = {
 
-	-- 100 - Niebiescy
-	-- 200 - Fioletowi
-
-	-----------------------
-	--# PurpleTeam Base #--
-	-----------------------
+	-- {x axis, y axis, z axis, parameters}
+	-- 0 - Normal Warding Spot
+	-- 1 - Recommended Ward
+	-- 2 - Situational Ward
+	-- 3 - Blue Team Ward
+	-- 4 - Purple Team Ward
+	-- 5 - Unrecommended (Hide by default) 
+	-- 6 - Highlighted (for debug purposes)
 	
-	-- Defensive Wards --
-	{12083,52,9407}, -- Blue Jungle Entrance
-	{9753,52,12071}, -- Red Jungle Entrance
+	---------------------------
+	--# Team-Specific Wards #--
+	---------------------------
+	
+	-- Blue Team (100) --
+	{4956,51,2834,3},  -- Base sideEntrance from Red Jungle
+	{2697,52,5280,3},  -- Base sideEntrance from Blue Jungle
+	{10046,48,6575,3}, -- Middle Lane River Entrance Bush
+	
+	-- Purple Team (200) --
+	
+	{3041,95,3068,4},  -- Middle Lane Blue Inhibitor Ward
+	
+	{9753,52,12071,4}, -- Base sideEntrance from Red Jungle
+	{12083,52,9407,4}, -- Base sideEntrance from Blue Jungle
+	{9752,-37,6288,4}, -- Middle Lane River Entrance Bush
+	
+	
 	
 	--------------------------------
 	--# PurpleTeam - Blue Jungle #--
@@ -37,62 +65,60 @@ local wardSpots = {
 	{11890,51,6964}, -- Blue/Frog Base Entrance
 	{11703,50,6054}, -- Blue/Frog River Entrance
 	{12684,51,5202}, -- Bottom Lane Jungle Bush Entrance
-	{10046,48,6575}, -- Middle Lane River Entrance Bush (Top)
-	{9752,-37,6288}, -- Middle Lane River Entrance Bush (Bot)
-	{10701,63,8975}, -- Middle Lane Wolves Entrance
+	--{10701,63,8975}, -- Middle Lane Wolves Entrance * This spot needs rework...
 	{10140,51,7703}, -- Middle Lane Bush Crossroad
-	{14001,52,7127}, -- Tier 2 Tower Bush (Top Side)
-	{14005,52,6786}, -- Tier 2 Tower Bush (Bot Side)
 	
 	-------------------------------
 	--# PurpleTeam - Red Jungle #--
 	-------------------------------
 	
-    {7097,54,11353}, -- Red Bush (Right)
-	{6750,53,11529}, -- Red Bush (Center)
-	{6415,56,11356}, -- Red Bush (Left)
+	-- Universal Spots --
+    {7097,54,11353}, -- Red Bush (Right Edge)
 	{6343,54,10054}, -- River Crossroad Bush
+	{6742,54,9621},  -- River Crossroad
 	{4269,51,11752}, -- Tribush
-	{5648,52,12829}, -- Krug Bush (Lane Vision)
 	{5808,52,12640}, -- Krug Bush (Jungle Vision)
-	{6978,52,14046}, -- Tier 2 Tower Bush (Left Side)
-	{7343,52,14038}, -- Tier 2 Tower Bush (Rigth Side)
-	{7701,53,11759}, -- Red Crossroad (Left)
-	{5298,56,11882}, -- Red Crossroad (Right)
-	{7969,56,11931}, -- Red Crossroad (Center)
-	{8976,55,11344}, -- Base Entrance Bush (Jungle-side)
-	{9445,52,11436}, -- Base Entrance Bush (Base-side)
-	{8156,49,10270}, -- Raptor Bush (Left)
-	{8392,50,10205}, -- Raptor Bush (Right)
-	{6742,54,9621},  -- Raptor Crossroad
-
-	---------------------
-	--# BlueTeam Base #--
-	---------------------
-
-	{4956,51,2834}, -- Red Jungle Entrance  (Defensive Ward)
-	{2697,52,5280}, -- Blue Jungle Entrance (Defensive Ward)
-	{3041,95,3068}, -- Middle Lane Inhibitor Ward (Agressive Ward)
+	{8976,55,11344}, -- Base Entrance Bush (Left Edge)
+	{9445,52,11436}, -- Base Entrance Bush (Right Edge)
 	
+	-- Unrecommended Spots --
+	{7969,56,11931,5}, -- Red Crossroad Bush (Center)
+	{6750,53,11529,5}, -- Red Bush (Center Edge)
+	{5648,52,12829,5}, -- Krug Bush (Lane Vision)
+	
+	-- Purple Team Recommendations --
+	{6415,56,11356,4}, -- Red Bush (Left Edge)
+	{7701,53,11759,4}, -- Red Crossroad (Left Edge)
+	{8156,49,10270,4}, -- Raptor Bush (Left Edge)
+	
+	-- Blue Team Recommendations --
+	--{5298,56,11882,6}, -- Red Crossroad (Right Edge) * Not working dunno why
+	{8392,50,10205,5}, -- Raptor Bush (Right Edge)
+
 	-----------------------------
 	--# BlueTeam - Red Jungle #--
 	-----------------------------
 	
-	{8347,53,3534}, -- Red Bush Right
-	{8108,51,3392}, -- Red Bush Center
-	{7802,52,3541}, -- Red Bush Left
-	{6550,50,3088}, -- Red Crossroad Left
-	{6861,52,2985}, -- Red Crossroad Center
-	{7143,52,3076}, -- Red Crossroad Right
-	{8490,52,4926}, -- Raptors Crossroad
-	{8117,53,5314}, -- Raptors Crossroad Bush
-	{6689,48,4718}, -- Raptors Bush
+	-- Universal Spots --
+	{7802,52,3541}, -- Red Bush (Left Edge)
+	{6861,52,2985}, -- Red Crosroad Bush (Center)
+	{5835,51,3578}, -- Base Entrance Bush (Right Edge)
+	{5404,51,3469}, -- Base Entrance Bush (Left Edge)
+	{10610,48,3105},-- Tribush
 	{9211,50,2281}, -- Krug Camp Brush
-	{5835,51,3578}, -- Base side-entrance Bush (Right Side)
-	{5404,51,3469}, -- Base side-entrance Bush (Left Side)
-	{7629,49,830},  -- Tier 2 Tower Bush (Left Side)
-	{7996,49,842},  -- Tier 2 Tower Bush (Right Side)
-	{10610,48,3105},-- Bottom Lane Tribush
+	{6689,48,4718}, -- Raptors Bush
+	{8490,52,4926}, -- River Crossroad
+	{8117,53,5314}, -- River Crossroad Bush
+	
+	-- Purple Team Recommendations --
+	{6550,50,3088,4}, -- Red Crossroad Bush (Left Edge)
+	
+	-- Blue Team Recommendations --
+	{7143,52,3076,3}, -- Red Crossroad Bush (Right Edge)
+	
+	-- Unrecommended Spots --
+	{8347,53,3534,5}, -- Red Bush (Right Edge)
+	{8108,51,3392,5}, -- Red Bush (Center Edge)
 	
 	-----------------------------
 	--# BlueTeam - Blue Jungle #--
@@ -105,18 +131,18 @@ local wardSpots = {
 	{4649,50,7247}, -- Jungle River Entrance Crossroad
 	{2281,54,10124},-- Tribush (Defensive Ward)
 	{2153,59,9703}, -- Tribush (Agressive Ward)
-	{896,52,7930},  -- Tier 2 Tower Bush (Bot Side)
-	{887,52,8341},  -- Tier 2 Tower Bush (Top Side)
 	
-	--# River and meeting points #--
-	{9339,72,5727},  -- Dragon River Bush
-	{10188,63,5269}, -- Dragon Entrance Ward (Mid Jungle Entrance)
-    {10546,60,5019}, -- Dragon Entrance Ward (Blue Entrance)
-	{4102,-72,9857}, -- Baron Entrance Ward
-	{4684,-72,10050},-- Baron Den Ward
-	{5104,-72,9152}, -- Baron Bush
-	{6457,-72,8430}, -- Middle Lane Bush - Top Side
-	{8483,-72,6384}, -- Middle Lane Bush - Bot Side
+	--# River and Lanes #--
+	
+	-- Universal Spots --
+	{13453,51,2820}, -- Bottom Lane Purple-side Bush (Top Edge)
+	{13004,51,2216}, -- Bottom Lane Purple-side Bush (Bot Edge)
+	{12773,52,1876}, -- Bottom Lane Blue-side Bush (Top Edge)
+	{12103,51,1328}, -- Bottom Lane Blue-side Bush (Bot Edge)
+	{11127,-71,3810},-- Bottom Lane River Entrance Bush
+	{11701,71,4050}, -- Bottom Lane River Entrance
+	{6457,-72,8430}, -- Middle Lane Bush - Top/Left Side
+	{8483,-72,6384}, -- Middle Lane Bush - Bot/Right Side
 	{2694,52,13546}, -- Top Lane 3rd Bush - Right
 	{2252,52,13254}, -- Top Lane 3rd Bush - Left
 	{1893,52,13003}, -- Top Lane 2nd Bush - Right
@@ -124,18 +150,29 @@ local wardSpots = {
 	{1392,52,12464}, -- Top Lane 1st Bush - Right
 	{1216,52,12044}, -- Top Lane 1st Bush - Left
 	{3193,-66,10760},-- Top Lane River Bush
-	{11127,-71,3810},-- Bottom Lane River Entrance Bush
-	{11701,71,4050}, -- Bottom Lane River Entrances Ward
-	{11011,-71,5292},-- Purple Jungle Dragon Entrance
-	{13453,51,2820}, -- Bottom Lane Purple Bush - Top
-	{13004,51,2216}, -- Bottom Lane Purple Bush - Bot
-	{12773,52,1876}, -- Bottom Lane Blue Bush - Top
-	{12103,51,1328} -- Bottom Lane Blue Bush - Bot
+	{9339,72,5727},  -- Dragon Bush
+	{10188,63,5269}, -- Dragon Entrance from Purple Middle Lane Jungle
+	{5104,-72,9152}, -- Baron Bush
+	{4102,-72,9857}, -- Baron Entrance
+	{4684,-72,10050},-- Baron Den
+	
+	-- Blue Team Recommendations --
+	{14001,52,7127,3}, -- Purple Tier 2 Bottom Tower Bush
+	{732,52,14037,3},  -- Purple Tier 2 Top Tower Bush
+	{7996,49,842,3},   -- Blue Tier 2 Bottom Tower Bush
+	{887,52,8341,3},   -- Blue Tier 2 Top Tower Bush
+    {10546,60,5019,3}, -- Dragon Entrance from Blue
+	
+	-- Purple Team Recommendations --
+	{14005,52,6786,4}, -- Purple Tier 2 Bottom Tower Bush
+	{9030,52,14039,4}, -- Purple Tier 2 Top Tower Bush
+	{7629,49,830,4},   -- Blue Tier 2 Bottom Tower Bush
+	{896,52,7930,4}    -- Blue Tier 2 Top Tower Bush
 };
 
 local safeWardSpots = {
 
-	--[[{	-- Tribush from Dragon * Not working without mastery...
+	--[[{	-- Tribush from Dragon * Not working without mastery atm...
 		["scoutRequired"]	= false,
 		["heroPosition"]	= {10072,-71.24,3908},
 		["clickPosition"]	= {10297.93,49.03,3358.59},
@@ -261,17 +298,6 @@ function getWardSlot ()
 	return 0;
 end;
 
---# Checking if player got "Scout" from utility mastery tree #--
-function getScoutStatus ()
-	-- 690 Trinket z masterka 600 bes
-	local itemSlot = GetItemSlot(myHero,3340);
-	if itemSlot == 0 then itemSlot = GetItemSlot(myHero,3361); end;
-	if itemSlot ~= 0 and GetCastRange(itemSlot) == 690
-		then return true;
-	end;
-	return false;
-end;
-
 --# Warding Queue #--
 local wardQueued = nil;
 function checkWardingQueue(wardSlot)
@@ -281,12 +307,7 @@ function checkWardingQueue(wardSlot)
 	
 		-- Check if the player interrupted the process?
 		if KeyIsDown(0x02)	-- Right Mouse Button
-		or KeyIsDown(0x41)	-- A Key (Attack)
-		or KeyIsDown(0x53)	-- S Key (Stop)
-		then
-			-- Just clear the queue since player doesn't care anymore...
-			wardQueued = nil;
-		end;
+			then wardQueued = nil; end;
 		
 		-- Check if player is already close enough to put this ward...
 		local heroPosition = GetOrigin(myHero);
@@ -301,6 +322,39 @@ function checkWardingQueue(wardSlot)
 			-- Clear the queue since the job is done.
 			wardQueued = nil;
 		end;
+	end;
+end;
+
+--# Checking spot restrictions #--
+function checkSpotRestrictions (spotStatus)
+
+	-- First of all check if there're any restrictions for this spot...
+	if spotStatus ~= nil then
+	
+		-- Players is in Blue Team and this spot is dedicated for Blue Team?
+		if (GetTeam(myHero) == 100 and spotStatus == 3)
+		
+		-- Players is in Purple Team and this spot is dedicated for Purple Team?
+		or (GetTeam(myHero) == 200 and spotStatus == 4)
+		
+		-- This spot is team-specific but player choosed to see both team spots?
+		or ((spotStatus == 3 or spotStatus == 4) and WAConfig.ShowEnemyTeamSpots)
+		
+		-- This spot is unrecommended but player choosed to see those spots?
+		or (WAConfig.ShowUnrecommended and spotStatus == 5)
+		
+		-- This spot is marked by developer for some debug reason. Always show those spots.
+		or spotStatus == 6
+		
+		-- If any of those statements is true then just show the spot...
+		then return true;
+		
+		-- Otherwise deny it.
+		else return false;
+		end;
+	
+	-- Just pass the spot if there's no restrictions...
+	else return true;
 	end;
 end;
 
@@ -329,38 +383,46 @@ OnLoop(function(myHero)
 			-- Check all normal warding spots
 			for i=1, #wardSpots, 1 do
 			
-				-- Get the warding spot...
-				local wardPosition = Point(wardSpots[i][1],wardSpots[i][2],wardSpots[i][3]);
-			
-				-- Calculate the distance
-				local distance = GetDistanceSqr(wardPosition,GetOrigin(myHero));
-			
-				-- It is a closest ward?
-				if distance < closestWardDistance then
-					closestWard = wardPosition;
-					closestWardDistance = distance;
-				end;
-			
-				-- Don't show warding circles if hero is too far away
-				if WAConfig.Nearby ~= true or distance < 1000000
-				then
+				-- Check ward spot restrictions...
+				if checkSpotRestrictions(wardSpots[i][4]) then
 				
-					-- Initialize the circle
-					Circle:__init(wardPosition,30);
-					
-					local myszka = GetMousePos();
-					local point = Point(myszka.x,myszka.y,(myszka.z+myszka.y));
-					if Circle:contains(point) then
-						Circle:draw(0xffff0000);
+					-- Get the warding spot...
+					local wardPosition = Point(wardSpots[i][1],wardSpots[i][2],wardSpots[i][3]);
+				
+					-- It is a closest ward spot?
+					local distance = GetDistance(wardPosition,GetOrigin(myHero));
+					if distance < closestWardDistance then
+						closestWard = wardPosition;
+						closestWardDistance = distance;
+					end;
+				
+					-- Don't show warding circles if hero is too far away
+					if WAConfig.ShowNearbyOnly ~= true or distance < 2500
+					then
+						-- Initialize the circle
+						Circle:__init(wardPosition,30);
 						
-						-- Manual ward
-						if WAConfig.WardKey then
-							CastSkillShot(wardSlot,wardPosition);
+						-- Mouse hovered circle
+						local point = Point(GetMousePos());
+						if Circle:contains(point) then
+							Circle:draw(0xffff0000);
+							
+							-- Manual ward
+							if WAConfig.WardKey then
+								CastSkillShot(wardSlot,wardPosition);
+							end;
+							
+						-- Normal circle
+						else 
+							if wardSpots[i][4] == 6 then
+								Circle:draw(0xffff0000);
+							elseif wardSpots[i][4] == 5 then
+								Circle:draw(0xcc777777);
+							else
+								Circle:draw(0xffffffff);
+							end;
 						end;
-						
-					-- Normal circle
-					else Circle:draw(0xffffffff); end;
-				
+					end;
 				end;
 			end;
 			
@@ -386,38 +448,43 @@ OnLoop(function(myHero)
 					safeWardSpots[i]["clickPosition"][3]
 				);
 			
-				-- Initialize the circle
-				Circle:__init(wardPosition,20);
-				Circle:draw(0x66ff0000);
+				-- Don't show warding circles if hero is too far away
+				local distance = GetDistance(heroPosition,GetOrigin(myHero));
+				if WAConfig.ShowNearbyOnly ~= true or distance < 2500 then
 				
+					-- Initialize the circle
+					Circle:__init(wardPosition,20);
+					Circle:draw(0x66ff0000);
 					
-				-- clickPosition Circle 
-				Circle:__init(heroPosition,60);
-				local myszka = GetMousePos();
-				local point = Point(myszka.x,myszka.y+safeWardSpots[i]["wardPosition"][2],myszka.z);
-				if Circle:contains(GetMousePos()) then
-					Circle:draw(0xff00ff00);
-					
-						local origin = GetOrigin(myHero);
-						tester = GetDistance(origin,clickPosition);
-					-- Manual ward
-					if WAConfig.WardKey then
-						--if IsInDistance(clickPosition,690) then
-						if GetDistance(origin,clickPosition) < 690 then
-							CastSkillShot(wardSlot,clickPosition);
-						else
-							wardQueued = clickPosition;
-							MoveToXYZ(heroPosition); 
+						
+					-- clickPosition Circle 
+					Circle:__init(heroPosition,60);
+					local myszka = GetMousePos();
+					local point = Point(myszka.x,myszka.y+safeWardSpots[i]["wardPosition"][2],myszka.z);
+					if Circle:contains(GetMousePos()) then
+						Circle:draw(0xff00ff00);
+						
+							local origin = GetOrigin(myHero);
+							tester = GetDistance(origin,clickPosition);
+						-- Manual ward
+						if WAConfig.WardKey then
+							--if IsInDistance(clickPosition,690) then
+							if GetDistance(origin,clickPosition) < 690 then
+								CastSkillShot(wardSlot,clickPosition);
+							else
+								wardQueued = clickPosition;
+								MoveToXYZ(heroPosition); 
+							end;
 						end;
+						
+					-- Just show the circle...
+					else Circle:draw(0xffffffff); end;
+					
+					-- Automatic ward
+					if WAConfig.AutoWardKey then
+						CastSkillShot(wardSlot,closestWard);
+						
 					end;
-					
-				-- Just show the circle...
-				else Circle:draw(0xffffffff); end;
-				
-				-- Automatic ward
-				if WAConfig.AutoWardKey then
-					CastSkillShot(wardSlot,closestWard);
-					
 				end;
 			end;
 		
