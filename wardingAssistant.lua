@@ -140,7 +140,7 @@ local wardSpots = {
 	{12773,52,1876}, -- Bottom Lane Blue-side Bush (Top Edge)
 	{12103,51,1328}, -- Bottom Lane Blue-side Bush (Bot Edge)
 	{11127,-71,3810},-- Bottom Lane River Entrance Bush
-	{11701,71,4050}, -- Bottom Lane River Entrance
+	{11701,-71,4050}, -- Bottom Lane River Entrance
 	{6457,-72,8430}, -- Middle Lane Bush - Top/Left Side
 	{8483,-72,6384}, -- Middle Lane Bush - Bot/Right Side
 	{2694,52,13546}, -- Top Lane 3rd Bush - Right
@@ -150,8 +150,8 @@ local wardSpots = {
 	{1392,52,12464}, -- Top Lane 1st Bush - Right
 	{1216,52,12044}, -- Top Lane 1st Bush - Left
 	{3193,-66,10760},-- Top Lane River Bush
-	{9339,72,5727},  -- Dragon Bush
-	{10188,63,5269}, -- Dragon Entrance from Purple Middle Lane Jungle
+	{9339,-72,5727},  -- Dragon Bush
+	{10188,-63,5269}, -- Dragon Entrance from Purple Middle Lane Jungle
 	{5104,-72,9152}, -- Baron Bush
 	{4102,-72,9857}, -- Baron Entrance
 	{4684,-72,10050},-- Baron Den
@@ -161,7 +161,7 @@ local wardSpots = {
 	{732,52,14037,3},  -- Purple Tier 2 Top Tower Bush
 	{7996,49,842,3},   -- Blue Tier 2 Bottom Tower Bush
 	{887,52,8341,3},   -- Blue Tier 2 Top Tower Bush
-    {10546,60,5019,3}, -- Dragon Entrance from Blue
+    {10546,-60,5019,3}, -- Dragon Entrance from Blue
 	
 	-- Purple Team Recommendations --
 	{14005,52,6786,4}, -- Purple Tier 2 Bottom Tower Bush
@@ -403,9 +403,12 @@ OnLoop(function(myHero)
 						Circle:__init(wardPosition,30);
 						
 						-- Mouse hovered circle
+						
+						
 						local point = Point(GetMousePos());
 						if Circle:contains(point) then
 							Circle:draw(0xffff0000);
+						--PrintChat("X: "..wardSpots[i][1].." Y: "..wardSpots[i][2].." Z: "..wardSpots[i][3]);
 							
 							-- Manual ward
 							if WAConfig.WardKey then
