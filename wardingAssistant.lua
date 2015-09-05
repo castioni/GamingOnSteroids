@@ -1,6 +1,6 @@
 -- General settings --
 WAConfig = scriptConfig("Warding Assistant", "Warding Assistant");
-WAConfig.addParam("Version", "Version 0.4 BETA", SCRIPT_PARAM_INFO, false);
+WAConfig.addParam("Version", "Version 1.0 RC 1", SCRIPT_PARAM_INFO, false);
 WAConfig.addParam("Enabled", "Script Enabled", SCRIPT_PARAM_ONOFF, true);
 
 -- Drawing options --
@@ -9,22 +9,50 @@ WAConfig.addParam("ShowEnemyTeamSpots",	"Enemy team spots", SCRIPT_PARAM_ONOFF, 
 WAConfig.addParam("ShowNearbyOnly",		"Only nearby spots", SCRIPT_PARAM_ONOFF, true);
 WAConfig.addParam("ShowSafeWards",		"SafeWards spots", SCRIPT_PARAM_ONOFF, true);
 
+-- Functionatily options --
+WAConfig.addParam("wardClosestSpot",	"Snap to closest", SCRIPT_PARAM_ONOFF, true);
+
 -- Keybind options --
-WAConfig.addParam("WardKey", "Ward selected spot", SCRIPT_PARAM_KEYDOWN, string.byte("Z"));
-WAConfig.addParam("AutoWardKey", "Ward closest spot", SCRIPT_PARAM_KEYDOWN, string.byte("O"));
+WAConfig.addParam("WardKey",			"Warding Key", SCRIPT_PARAM_KEYDOWN, string.byte("Z"));
 
--- Some debug tools, I'll remove it from the final version.
-local developerMode = false;
-
---# Point Class #--
-class "Point"
-  function Point:__init(x, y, z)
+--# Classes #--
+class "Point" function Point:__init(x, y, z)
     local pos = GetOrigin(x) or type(x) ~= "number" and x or nil
     self.x = pos and pos.x or x
     self.y = pos and pos.y or y
     self.z = pos and pos.z or z
-  end
+end;
 
+--# Variables #--
+local playerPosition = nil;		-- Result of GetOrigin(myHero);
+local cursorPosition = nil;		-- Result of Point(GetMousePos());
+local wardSlot = 0;				-- Result of getWardSlot();
+
+local lastTriggerTick = GetTickCount();		-- Script global cooldown. Used to prevent from double-warding from one command.
+local closestToCursor = nil;	-- Used to determine the closest warding stop from the player cursor.
+local closestToCursorRange=nil;	-- Like above.
+local hoveredCircle = nil;		-- Used to determine if player selected any predefinied spots by himself.
+
+--# Constant Variables #--
+local spotVisibilityRange = 2500;
+local spotCircleSize = 30;
+local wardCastRange = 600;
+local colorTable = {
+	["red"]		= {255,0,0},
+	["green"]	= {0,255,0},
+	["blue"]	= {0,0,255},
+	["black"]	= {0,0,0},
+	["white"]	= {255,255,255}
+};
+local wardItems = {
+	3340,	-- Warding Totem (Trinket)
+	3361,	-- Greater Warding Totem (Trinket Upgrade)
+	2049,	-- Sightstone (Blue Stone)
+	2045,	-- Ruby Sightstone (Red Stone)
+	2044	-- Stealth Ward (Grenn Ward)
+}
+
+-- faster than recall
 --# Warding Spots #--
 local wardSpots = {
 
@@ -277,18 +305,9 @@ local safeWardSpots = {
 	
 };
 
---# Warding Sources #--
-local wardItems = {
-	3340,	-- Warding Totem (Trinket)
-	3361,	-- Greater Warding Totem (Trinket Upgrade)
-	2049,	-- Sightstone (Blue Stone)
-	2045,	-- Ruby Sightstone (Red Stone)
-	2044	-- Stealth Ward (Grenn Ward)
-}
-
 --# Searching for available warding item #--
 -- Thanks for ilovesona and his Simple Ward Jump script for this solution!
-function getWardSlot ()
+local function getWardSlot()
 	local itemSlot = 0;
 	for i=1, #wardItems, 1 do
 		itemSlot = GetItemSlot(myHero,wardItems[i]);
@@ -298,35 +317,45 @@ function getWardSlot ()
 	return 0;
 end;
 
+--# FUNCTION: Put ward at the selected spot
+local function putWard(wardPosition)
+	CastSkillShot(wardSlot,wardPosition);
+	-- This function is pretty useless after last update, but i won't remove it just yet...
+end;
+
 --# Warding Queue #--
-local wardQueued = nil;
-function checkWardingQueue(wardSlot)
-	
-	-- Don't go any futher if queue is empty!
-	if wardQueued ~= nil then
+local wardingQueue = {};
+local queueStarted = false;
+function queueReset() wardingQueue = {}; queueStarted = false; end;
+function queueAdd(value) table.insert(wardingQueue,value); end;
+function doScheduledTasks(wardSlot)
+	if next(wardingQueue) ~= nil then -- Just exit from the function is queue is empty.
 	
 		-- Check if the player interrupted the process?
-		if KeyIsDown(0x02)	-- Right Mouse Button
-			then wardQueued = nil; end;
+		if KeyIsDown(0x02) 							-- RMB
+		or (KeyIsDown(0x01) and KeyIsDown(0x10))	-- SHIFT + LMB
+		or KeyIsDown(0x42)							-- B (Recall)
+		or KeyIsDown(0x53)							-- S (Stop)
+		then queueReset();
 		
-		-- Check if player is already close enough to put this ward...
-		local heroPosition = GetOrigin(myHero);
-		if GetDistance(heroPosition,wardQueued) < 600 then
-		
-			-- Just in case if function will be executed without wardSlot variable...
-			wardSlot = wardSlot or getWardSlot();
-		
-			-- Put ward on it's place already...
-			CastSkillShot(wardSlot,wardQueued);
-			
-			-- Clear the queue since the job is done.
-			wardQueued = nil;
+		-- Try to compleate current task
+		elseif queueStarted == true then
+			if GetDistance(wardingQueue[1][1],playerPosition) < wardCastRange then
+				putWard(wardingQueue[1][1]);	-- Put current ward according to the plan
+				table.remove(wardingQueue,1);	-- Delete current task and get next one
+				queueStarted = false;			-- This step is finished.
+			end;
+				
+		-- Force hero to move to the warding position
+		else
+			MoveToXYZ(wardingQueue[1][2]);
+			queueStarted = true;
 		end;
 	end;
 end;
 
---# Checking spot restrictions #--
-function checkSpotRestrictions (spotStatus)
+--# FUNCTION: Checking spot restrictions
+function verifyRestrictions(spotStatus)
 
 	-- First of all check if there're any restrictions for this spot...
 	if spotStatus ~= nil then
@@ -348,168 +377,160 @@ function checkSpotRestrictions (spotStatus)
 		
 		-- If any of those statements is true then just show the spot...
 		then return true;
-		
-		-- Otherwise deny it.
 		else return false;
 		end;
+	end;
 	
 	-- Just pass the spot if there's no restrictions...
-	else return true;
+	return true;
+end;
+
+--# PROCEDURE: Warding key trigger
+local function wardingKeyTrigger()
+	local currentTriggerTick = GetTickCount();
+	if WAConfig.WardKey								-- Execute only if player pressed his warding key
+	and currentTriggerTick > (lastTriggerTick + 1000)	-- And only it the warding key is not on cooldown (1 second)
+	then
+	
+		-- Update the last trigger tick data
+		lastTriggerTick = currentTriggerTick;
+		
+		-- There is an active circle on the map, so add this circle to the queue
+		if hoveredCircle ~= nil then
+			queueAdd(hoveredCircle);
+		PrintChat("HOVER!");
+		
+		-- If there's no active circles on the map, enable warding to the closest spot.
+		elseif WAConfig.wardClosestSpot then
+			putWard(closestToCursor);
+			queueReset(); -- This action will broke the queue process, so we need to reset the queue.
+			
+		-- If absolutely nothing happend, then just decrease warding cooldown by 0.6s.
+		else lastTriggerTick = lastTriggerTick - 600; end;
+	else 
 	end;
 end;
 
--- Let's get this party started...
+--# PROCEDURE: Draw classic warding spot circle
+local function drawClassicSpot(wardPosition,distanceFromHero,color)
+	local RGB = {};
+	local opacity = 0;
+	
+	-- Initialize circle position
+	Circle:__init(wardPosition, spotCircleSize);
+	
+	-- Determine ward closest to player cursor
+	local distanceFromCursor = GetDistance(wardPosition,cursorPosition);
+	if closestToCursor == nil then
+		closestToCursor = wardPosition;
+		closestToCursorRange = distanceFromCursor;
+	elseif distanceFromCursor < closestToCursorRange or closestToCursor == nil then
+		closestToCursor = wardPosition;
+		closestToCursorRange = distanceFromCursor;
+	end;
+	
+	-- Special color an trigger for targeted spots
+	if Circle:contains(cursorPosition) then
+		hoveredCircle = {wardPosition,wardPosition};
+		RGB = {255,255,255};
+		opacity = 255;
+	
+	-- Use standard colors if spot is not targeted by the player
+	else
+	
+		-- Set silver as default circle color
+		RGB = {180,180,180};
+		opacity = math.floor((1 - (distanceFromHero / spotVisibilityRange)) * 255);
+		
+		-- Determine circle color
+		if color ~= nil then
+			local variableType = type(color);
+			if variableType == "table" then
+				RGB = {color[1], color[2], color[3]};
+			elseif variableType == "string" then
+				RGB = {colorTable[color][1],colorTable[color][2],colorTable[color][3]}; -- Using colorTable is faster than using elseif for each color.
+			end;
+		end;
+	end;
+	
+	-- Draw the warding spot with opacity depending on distance from the spot.
+	Circle:draw(ARGB(opacity,RGB[1],RGB[2],RGB[3]));
+end;
+
+--# PROCEDURE: Draw safe warding spot circle
+local function drawSafeSpot(wardPosition,heroPosition,clickPosition,distanceFromHero)
+	local opacity = 255;
+
+	-- Ward destination place circle
+	Circle:__init(wardPosition, math.ceil(spotCircleSize/2));
+	Circle:draw(ARGB(170,255,255,255));
+	
+	-- Required hero position circle
+	Circle:__init(heroPosition,math.floor(spotCircleSize*1.8));
+	if Circle:contains(cursorPosition) then
+		hoveredCircle = {clickPosition,heroPosition};
+	else opacity = math.floor((1 - (distanceFromHero / spotVisibilityRange)) * 255);
+	end;
+	Circle:draw(ARGB(opacity,255,255,255));
+end;
+
+--# FUNCTION: Check if warding spot is in visible range
+local function isVisible(heroDistance)
+	if WAConfig.ShowNearbyOnly == false
+	or heroDistance < spotVisibilityRange then
+		return true;
+	end;
+	return false;
+end;
+
+--# PROCEDURE: Draw all warding spots
+local function drawWardingSpots()
+
+	-- Classic Warding Spots
+	for i=1, #wardSpots, 1 do
+		if verifyRestrictions(wardSpots[i][4]) then
+			local wardPosition = Point(wardSpots[i][1],wardSpots[i][2],wardSpots[i][3]);
+			local distanceFromHero = GetDistance(wardPosition,playerPosition);
+			if isVisible(distanceFromHero) then
+				drawClassicSpot(wardPosition,distanceFromHero)
+			end;
+		end;
+	end;
+	
+	-- Safe Warding Spots
+	for i=1, #safeWardSpots, 1 do
+		local wardPosition = Point(		-- Ward destination
+			safeWardSpots[i]["wardPosition"][1],
+			safeWardSpots[i]["wardPosition"][2],
+			safeWardSpots[i]["wardPosition"][3]);
+		local heroPosition = Point(		-- Required hero position
+			safeWardSpots[i]["heroPosition"][1],
+			safeWardSpots[i]["heroPosition"][2],
+			safeWardSpots[i]["heroPosition"][3]);
+		local clickPosition = Point(	-- Trigger zone
+			safeWardSpots[i]["clickPosition"][1],
+			safeWardSpots[i]["clickPosition"][2],
+			safeWardSpots[i]["clickPosition"][3]);
+		local distanceFromHero = GetDistance(wardPosition,playerPosition);
+		if isVisible(distanceFromHero) then
+			drawSafeSpot(wardPosition,heroPosition,clickPosition,distanceFromHero);
+		end;
+	end;
+end;
+
+--# MAIN SCRIPT #--
 OnLoop(function(myHero)
-	
-	-- Is Warding Assistant enabled?
 	if WAConfig.Enabled then
-	
-		-- First of all, check if player got any wards with him...
-		local wardSlot = getWardSlot();
-	
-		-- Check if there's any warding process on the run...
-		checkWardingQueue(wardSlot);
-		
-		-- Don't show warding circles if player have no wards.
+		-- Disable Warding Assistant if player have no wards
+		wardSlot = getWardSlot();	
 		if wardSlot ~= 0 then
-			
-			-- Hello there my old friend, I'll need your help...
-			local i = 1;
-			
-			-- Consider 1st ward on the last as the closest one.
-			local closestWard = Point(wardSpots[1][1],wardSpots[1][2],wardSpots[1][3]);
-			local closestWardDistance = GetDistanceSqr(closestWard,GetOrigin(myHero));
-			
-			-- Check all normal warding spots
-			for i=1, #wardSpots, 1 do
-			
-				-- Check ward spot restrictions...
-				if checkSpotRestrictions(wardSpots[i][4]) then
-				
-					-- Get the warding spot...
-					local wardPosition = Point(wardSpots[i][1],wardSpots[i][2],wardSpots[i][3]);
-				
-					-- It is a closest ward spot?
-					local distance = GetDistance(wardPosition,GetOrigin(myHero));
-					if distance < closestWardDistance then
-						closestWard = wardPosition;
-						closestWardDistance = distance;
-					end;
-				
-					-- Don't show warding circles if hero is too far away
-					if WAConfig.ShowNearbyOnly ~= true or distance < 2500
-					then
-						-- Initialize the circle
-						Circle:__init(wardPosition,30);
-						
-						-- Mouse hovered circle
-						
-						
-						local point = Point(GetMousePos());
-						if Circle:contains(point) then
-							Circle:draw(0xffff0000);
-						--PrintChat("X: "..wardSpots[i][1].." Y: "..wardSpots[i][2].." Z: "..wardSpots[i][3]);
-							
-							-- Manual ward
-							if WAConfig.WardKey then
-								CastSkillShot(wardSlot,wardPosition);
-							end;
-							
-						-- Normal circle
-						else 
-							if wardSpots[i][4] == 6 then
-								Circle:draw(0xffff0000);
-							elseif wardSpots[i][4] == 5 then
-								Circle:draw(0xcc777777);
-							else
-								Circle:draw(0xffffffff);
-							end;
-						end;
-					end;
-				end;
-			end;
-			
-			-- Check safeWards
-			for i=1, #safeWardSpots, 1 do
-			
-				-- Get the warding spot...
-				local wardPosition = Point(
-					safeWardSpots[i]["wardPosition"][1],
-					safeWardSpots[i]["wardPosition"][2],
-					safeWardSpots[i]["wardPosition"][3]
-				);
-				
-				local heroPosition = Point(
-					safeWardSpots[i]["heroPosition"][1],
-					safeWardSpots[i]["heroPosition"][2],
-					safeWardSpots[i]["heroPosition"][3]
-				);
-				
-				local clickPosition = Point(
-					safeWardSpots[i]["clickPosition"][1],
-					safeWardSpots[i]["clickPosition"][2],
-					safeWardSpots[i]["clickPosition"][3]
-				);
-			
-				-- Don't show warding circles if hero is too far away
-				local distance = GetDistance(heroPosition,GetOrigin(myHero));
-				if WAConfig.ShowNearbyOnly ~= true or distance < 2500 then
-				
-					-- Initialize the circle
-					Circle:__init(wardPosition,20);
-					Circle:draw(0x66ff0000);
-					
-						
-					-- clickPosition Circle 
-					Circle:__init(heroPosition,60);
-					local myszka = GetMousePos();
-					local point = Point(myszka.x,myszka.y+safeWardSpots[i]["wardPosition"][2],myszka.z);
-					if Circle:contains(GetMousePos()) then
-						Circle:draw(0xff00ff00);
-						
-							local origin = GetOrigin(myHero);
-							tester = GetDistance(origin,clickPosition);
-						-- Manual ward
-						if WAConfig.WardKey then
-							--if IsInDistance(clickPosition,690) then
-							if GetDistance(origin,clickPosition) < 690 then
-								CastSkillShot(wardSlot,clickPosition);
-							else
-								wardQueued = clickPosition;
-								MoveToXYZ(heroPosition); 
-							end;
-						end;
-						
-					-- Just show the circle...
-					else Circle:draw(0xffffffff); end;
-					
-					-- Automatic ward
-					if WAConfig.AutoWardKey then
-						CastSkillShot(wardSlot,closestWard);
-						
-					end;
-				end;
-			end;
-		
-		-- Clear pending warding process if there's no wards left (lol)
-		else wardQueued =  nil; end;
-		
-	
-		-- Just some developer tools for you to competely ingore!
-		if developerMode == true then
-			local origin = GetOrigin(myHero);
-			local mousepos = GetMousePos();
-			local myscreenpos = WorldToScreen(1,origin.x,origin.y,origin.z);
-			DrawText(" " .. math.floor(mousepos.x) .. " " .. math.floor(mousepos.y) .. " " .. math.floor(mousepos.z),24,myscreenpos.x,myscreenpos.y-20,0xff00ff00); 
-			
-			local text =
-				"Trinket R:    " .. " " .. GetCastRange(myHero,GetItemSlot(myHero,2044)) .. "\n" ..
-				"TrinkUpgr:  " .. GetItemSlot(myHero,3361) .. " " .. CanUseSpell(myHero, GetItemSlot(myHero,3361)) .. "\n" ..
-				"Sightstone: " .. GetItemSlot(myHero,2049) .. " " .. CanUseSpell(myHero, GetItemSlot(myHero,2049)) .. "\n" ..
-				"Rubystone:  " .. GetItemSlot(myHero,2045) .. " " .. CanUseSpell(myHero, GetItemSlot(myHero,2045)) .. "\n" ..
-				"NormalWard: " .. GetItemSlot(myHero,2044) .. " " .. CanUseSpell(myHero, GetItemSlot(myHero,2044));
-				
-			--DrawText(text,24,myscreenpos.x,myscreenpos.y-50,0xff00ff00); 
-		end; 
+			playerPosition = GetOrigin(myHero);		-- Update current player champion position
+			cursorPosition = Point(GetMousePos());	-- Update current player cursor position
+			closestToCursor = nil;	-- Value reset 
+			hoveredCircle = nil;	-- Value reset
+			doScheduledTasks();	-- Check current wards in queue
+			drawWardingSpots();	-- Draw all warding spots on the map
+			wardingKeyTrigger();-- Check warding key trigger
+		end;
 	end;
 end)
