@@ -523,7 +523,7 @@ end;
 
 --# MAIN SCRIPT #--
 OnLoop(function(myHero)
-	if WAConfig.Enabled and then
+	if WAConfig.Enabled then
 		-- Disable Warding Assistant if player have no wards
 		wardSlot = getWardSlot();	
 		if wardSlot ~= 0 then
