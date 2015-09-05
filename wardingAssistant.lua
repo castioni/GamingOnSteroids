@@ -1,3 +1,6 @@
+-- Don't load this script on maps other than Summoners Rift
+if GetMapID() == SUMMONERS_RIFT then
+
 -- General settings --
 WAConfig = scriptConfig("Warding Assistant", "Warding Assistant");
 WAConfig.addParam("Version", "Version 1.0 RC 1", SCRIPT_PARAM_INFO, false);
@@ -520,7 +523,7 @@ end;
 
 --# MAIN SCRIPT #--
 OnLoop(function(myHero)
-	if WAConfig.Enabled then
+	if WAConfig.Enabled and then
 		-- Disable Warding Assistant if player have no wards
 		wardSlot = getWardSlot();	
 		if wardSlot ~= 0 then
@@ -533,4 +536,6 @@ OnLoop(function(myHero)
 			wardingKeyTrigger();-- Check warding key trigger
 		end;
 	end;
+
+end; -- This end is part of IF statement that checks the map.
 end)
