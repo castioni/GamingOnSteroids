@@ -536,6 +536,5 @@ OnLoop(function(myHero)
 			wardingKeyTrigger();-- Check warding key trigger
 		end;
 	end;
-
-end; -- This end is part of IF statement that checks the map.
 end)
+end; -- This end is part of IF statement that checks the map.
