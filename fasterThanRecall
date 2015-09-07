@@ -1,0 +1,135 @@
+local map = GetMapID();
+if map ~= HOWLING_ABYSS then
+
+	-- General settings --
+	FTRConfig = scriptConfig("fasterThanRecall", "Faster Than Recall");
+	FTRConfig.addParam("Version", "Version 0.1 Alpha", SCRIPT_PARAM_INFO, false);
+	FTRConfig.addParam("Enabled", "Script Enabled", SCRIPT_PARAM_ONOFF, true);
+
+	local myHero = GetMyHero();
+	local myTeam = GetTeam(myHero);
+	local myHeroPosition = GetOrigin(myHero);
+
+	class "Point" function Point:__init(x, y, z)
+		local pos = GetOrigin(x) or type(x) ~= "number" and x or nil
+		self.x = pos and pos.x or x
+		self.y = pos and pos.y or y
+		self.z = pos and pos.z or z
+	end;
+
+	--# SPAWN POINTS DECLARATION #---
+	local spawnPoint = {};
+	local homeguardItems = {3250,3255,3260,3265,3270,3275,3280};
+	local chargingItems = {2049,2045,2041};
+	if map == SUMMONERS_RIFT then -- There are different ranges for shop, regen, recharge and homeguard passive.
+		if myTeam == 100 then spawnPoint = {
+			[1] = { -- Shop range
+				{1044,110,1136},-- Mid Lane
+				{1288,108,720},	-- Bot Lane
+				{810,113,1238}	-- Top Lane
+			}, [2] = { -- Recharge range
+				{854,169,803},	-- Mid Lane
+				{918,174,580},	-- Bot Lane
+				{732,169,920}	-- Top Lane
+			}, [3] = { -- Homeguard range
+				{692,183,692},	-- Middle Lane
+				{878,176,486},	-- Bot Lane
+				{590,174,854}	-- Top Lane
+			}
+		}; else spawnPoint = {
+			[1] = { -- Shop range
+				{13666,115,13702},	-- Mid Lane
+				{13380,112,14016},	-- Top Lane
+				{14078,102,13438}	-- Bot Lane
+			}, [2] = { -- Recharge range
+				{14170,156,13848},	-- Bot Lane
+				{13794,158,14300},	-- Top Lane
+				{13907,156,13985}	-- Mid Lane
+			}, [3] = { -- Homeguard range
+				{14256,165,13944},	-- Bot Lane
+				{14012,165,14052},	-- Mid Lane
+				{13860,165,14334}	-- Top Lane
+			}
+		}; end;
+	elseif map == TWISTED_TREELINE then
+		if myTeam == 100 then spawnPoint = {
+			{1012,160,6761},	-- Bot entrance
+			{986,156,7891}		-- Top entrance
+		}; else spawnPoint = {
+			{14380,149,6645},	-- Bot entrance
+			{14390,159,7799}	-- Top entrance
+		}; end;
+	elseif map == CRYSTAL_SCAR then -- BROKEN WITH CURRENT API
+		if myTeam == 100 then
+		spawnPoint = {
+			{1407,-91,3591},
+			{969,-101,5135}
+		}; else spawnPoint = {
+			{1186,160,6785},
+			{786,157,7885}
+		}; end;
+	end;
+
+	-- Choosing the closest point to the player
+	local function closest(spawnPointTable)
+		local closestPoint = Point(spawnPointTable[1][1],spawnPointTable[1][2],spawnPointTable[1][3]);
+		local closestDistance = GetDistance(myHeroPosition,closestPoint);
+		for i=2, #spawnPointTable, 1 do
+			local currentPoint = Point(spawnPointTable[i][1],spawnPointTable[i][2],spawnPointTable[i][3]);
+			local currentDistance = GetDistance(myHeroPosition,currentPoint);
+			if currentDistance < closestDistance then
+				closestPoint = currentPoint;
+				closestDistance = currentDistance;
+			end;
+		end;
+		return closestPoint;
+	end;
+
+
+	-- FUNCTION: Get expected point of recall
+	local function getExpectedPoint()
+
+		-- Summoner's Rift
+		if map == SUMMONERS_RIFT then
+			local itemSlot = 0;
+
+			-- Point expected for players with Homeguard boots upgrade
+			for i=1, #homeguardItems, 1 do
+				if GetItemSlot(myHero,homeguardItems[i]) then
+					return closest(spawnPoint[3]);
+				end;
+			end;
+
+			-- Point expected for players with Sightstones and Flasks
+			for i=1, #chargingItems, 1 do
+				if GetItemSlot(myHero,chargingItems[i]) then
+					return closest(spawnPoint[2]);
+				end;
+			end;
+			
+			-- Point expected for health and mana regen (default)
+			return closest(spawnPoint[1]);
+		end;
+
+		-- Every other map
+		return closest(spawnPoint);
+	end;
+		
+	--# MAIN SCRIPT #--
+	OnProcessRecall(function(Object,recallProc)
+		if FTRConfig.Enabled then
+			if Object == myHero then
+				if recallProc.isStart == true then
+					myHeroPosition = GetOrigin(myHero);
+					local expectedPoint = getExpectedPoint();
+					local timeOnFoot = (GetDistance(GetOrigin(myHero),expectedPoint) / GetMoveSpeed(myHero)) * 1000;
+					local timeOnRecall = recallProc.totalTime;
+					if timeOnFoot < timeOnRecall then
+						MoveToXYZ(expectedPoint);
+					end;
+				end;
+			end;
+		end;
+	end)
+
+end; -- Skip this script for Howling Abyss
